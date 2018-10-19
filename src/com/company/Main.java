@@ -7,11 +7,16 @@ public class Main {
 
     public static void main(String[] args) {
         // write your code here
-        List<A> list = new ArrayList<>(10);
-        A a = new A();
-        B b = new B();
-        //list.add(a);
-        System.out.println(list.containsAll(null));
+        List<String> list = new ArrayList<>(0);
+        List<String> list1 = new ArrayList<>(0);
+        list.add("a");
+        list.add("b");
+        list.add("a");
+        list.add("a");
+        list1.add("a");
+        list1.add("a");
+        list.removeAll(list1);
+        System.out.println(list.toString());
     }
 }
 

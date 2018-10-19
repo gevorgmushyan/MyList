@@ -49,7 +49,7 @@ public class MyList<E> implements List<E> {
      */
     @Override
     public boolean isEmpty() {
-        return size == 0;
+        return size() == 0;
     }
 
     /**
@@ -85,9 +85,9 @@ public class MyList<E> implements List<E> {
          */
         @Override
         public boolean hasNext() {
-            if (size == 0)
+            if (size() == 0)
                 return false;
-            return index < size;
+            return index < size();
         }
 
         /**
@@ -161,9 +161,9 @@ public class MyList<E> implements List<E> {
      */
     @Override
     public Object[] toArray() {
-        if (size == 0)
+        if (size() == 0)
             return new Object[0];
-        return Arrays.copyOf(array, size);
+        return Arrays.copyOf(array, size());
     }
 
     /**
@@ -226,18 +226,40 @@ public class MyList<E> implements List<E> {
      */
     @Override
     public boolean add(E e) {
-        if (size == array.length)
-            resizeAndCopyArray();
-        array[size++] = e;
+        if (size() == array.length)
+            maximizeAndCopyArray();
+        addElementToArray(e);
         return true;
+    }
+
+    private void addElementToArray(E e) {
+        array[size()] = e;
+        size++;
     }
 
     /**
      * Maximized array two times, and replaces old values in new resized array
      */
-    private void resizeAndCopyArray() {
+    private void maximizeAndCopyArray() {
         Object[] newArray = new Object[array.length * 2];
-        System.arraycopy(array, 0, newArray, 0, array.length);
+        System.arraycopy(array, 0, newArray, 0, size());
+        array = newArray;
+    }
+
+    /**
+     * Minimize array one and a half times, and replaces old values in new resized
+     * array. The minnimal size of the massive shoulb be {@code defaultListSize}
+     */
+    private void minimizeAndCopyArray() {
+        if (array.length <= defaultListSize)
+            return;
+        if (array.length <= 2 * size())
+            return;
+        int n = (int) (array.length * 1.5);
+        if (n < defaultListSize)
+            n = defaultListSize;
+        Object[] newArray = new Object[(int) (array.length * 1.5)];
+        System.arraycopy(array, 0, newArray, 0, size());
         array = newArray;
     }
 
@@ -266,6 +288,34 @@ public class MyList<E> implements List<E> {
         return true;
     }
 
+    /**
+     * Removes all occurrence of the specified element from this list,
+     * if it is present (optional operation).  If this list does not contain
+     * the element, it is unchanged.  More formally, removes all element with
+     * the index {@code i} such that
+     * {@code Objects.equals(o, get(i))}
+     * (if such an element exists).  Returns {@code true} if this list
+     * contained the specified element (or equivalently, if this list changed
+     * as a result of the call).
+     *
+     * @param e element to be removed from this list, if present
+     * @return {@code true} if this list contained the specified element
+     * @throws ClassCastException if the type of the specified element
+     *                            is incompatible with this list
+     *                            (<a href="Collection.html#optional-restrictions">optional</a>)
+     */
+    public boolean removeAll(E e) {
+        if (size() == 0)
+            return false;
+        boolean res = false;
+        for (int i = 0; i < size(); i++)
+            if (Objects.equals(e, array[i])) {
+                remove(e);
+                res = true;
+            }
+        return res;
+    }
+
     // Bulk Modification Operations
 
     /**
@@ -287,7 +337,7 @@ public class MyList<E> implements List<E> {
     public boolean containsAll(Collection<?> c) {
         Iterator it = c.iterator();
         while (it.hasNext()) {
-            if(!contains(it.next()))
+            if (!contains(it.next()))
                 return false;
         }
         return true;
@@ -304,59 +354,241 @@ public class MyList<E> implements List<E> {
      * @param c collection containing elements to be added to this list
      * @return {@code true} if this list changed as a result of the call
      * @throws UnsupportedOperationException if the {@code addAll} operation
-     *         is not supported by this list
-     * @throws ClassCastException if the class of an element of the specified
-     *         collection prevents it from being added to this list
-     * @throws NullPointerException if the specified collection contains one
-     *         or more null elements and this list does not permit null
-     *         elements, or if the specified collection is null
-     * @throws IllegalArgumentException if some property of an element of the
-     *         specified collection prevents it from being added to this list
+     *                                       is not supported by this list
+     * @throws ClassCastException            if the class of an element of the specified
+     *                                       collection prevents it from being added to this list
+     * @throws NullPointerException          if the specified collection is null
+     * @throws IllegalArgumentException      if some property of an element of the
+     *                                       specified collection prevents it from being added to this list
      * @see #add(Object)
      */
     @Override
     public boolean addAll(Collection<? extends E> c) {
-        return false;
+        Iterator it = c.iterator();
+        if (!it.hasNext())
+            return false;
+        while (it.hasNext()) {
+            add((E) it.next());
+        }
+        return true;
     }
 
+    /**
+     * Inserts all of the elements in the specified collection into this
+     * list at the specified position (optional operation).  Shifts the
+     * element currently at that position (if any) and any subsequent
+     * elements to the right (increases their indices).  The new elements
+     * will appear in this list in the order that they are returned by the
+     * specified collection's iterator.  The behavior of this operation is
+     * undefined if the specified collection is modified while the
+     * operation is in progress.  (Note that this will occur if the specified
+     * collection is this list, and it's nonempty.)
+     *
+     * @param index index at which to insert the first element from the
+     *              specified collection
+     * @param c     collection containing elements to be added to this list
+     * @return {@code true} if this list changed as a result of the call
+     * @throws UnsupportedOperationException if the {@code addAll} operation
+     *                                       is not supported by this list
+     * @throws ClassCastException            if the class of an element of the specified
+     *                                       collection prevents it from being added to this list
+     * @throws NullPointerException          if the specified collection is null
+     * @throws IllegalArgumentException      if some property of an element of the
+     *                                       specified collection prevents it from being added to this list
+     * @throws IndexOutOfBoundsException     if the index is out of range
+     *                                       ({@code index < 0 || index > size()})
+     */
     @Override
     public boolean addAll(int index, Collection<? extends E> c) {
-        return false;
+        MyList list = getMyList(c);
+        if (list.size() != 0) {
+            addList(list);
+            return true;
+        }
+        return true;
     }
 
+    /**
+     * Get MyList item from collection {@code c}
+     *
+     * @return {@code MyList} from given collection {@code c}
+     * @throws NullPointerException if the specified collection is null
+     */
+    private MyList<E> getMyList(Collection<? extends E> c) {
+        if (c == null)
+            throw new NullPointerException();
+        MyList list = new MyList();
+        Iterator it = c.iterator();
+        while (it.hasNext()) {
+            add((E) it.next());
+        }
+        return list;
+    }
+
+    /**
+     * @param list MyList object to added current list
+     * @return current list if the siso of the {@code list} param is 0, else
+     *         return the added result list
+     * @throws NullPointerException          if the specified collection is null
+     */
+    public MyList<E> addList(MyList list) {
+        if (list == null)
+            throw new NullPointerException();
+        if (list.size() == 0)
+            return this;
+        Object[] newArray = new Object[size() + list.size()];
+        System.arraycopy(array, 0, newArray, 0, size());
+        System.arraycopy(list, 0, newArray, size(), list.size());
+        array = newArray;
+        size = size() + list.size();
+        return this;
+    }
+
+    /**
+     * Removes from this list all of its elements that are contained in the
+     * specified collection (optional operation).
+     *
+     * @param c collection containing elements to be removed from this list
+     * @return {@code true} if this list changed as a result of the call
+     * @throws ClassCastException if the class of an element of this list
+     *         is incompatible with the specified collection
+     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified collection is null
+     */
     @Override
     public boolean removeAll(Collection<?> c) {
-        return false;
+        Iterator it = c.iterator();
+        boolean modified = false;
+        while (it.hasNext()) {
+            E e = (E) it.next();
+            if(removeAll(e))
+                modified = true;
+        }
+        return modified;
     }
 
+    /**
+     * Retains only the elements in this list that are contained in the
+     * specified collection (optional operation).  In other words, removes
+     * from this list all of its elements that are not contained in the
+     * specified collection.
+     *
+     * @param c collection containing elements to be retained in this list
+     * @return {@code true} if this list changed as a result of the call
+     * @throws UnsupportedOperationException if the {@code retainAll} operation
+     *         is not supported by this list
+     * @throws ClassCastException if the class of an element of this list
+     *         is incompatible with the specified collection
+     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified collection is null
+     * @see #remove(Object)
+     * @see #contains(Object)
+     */
     @Override
     public boolean retainAll(Collection<?> c) {
         return false;
+        //TODO
     }
 
+    /**
+     * Removes all of the elements from this list (optional operation).
+     * The list will be empty after this call returns.
+     */
     @Override
     public void clear() {
-
+        size = 0;
+        minimizeAndCopyArray();
     }
 
+    // Positional Access Operations
+
+    /**
+     * Returns the element at the specified position in this list.
+     *
+     * @param index index of the element to return
+     * @return the element at the specified position in this list
+     * @throws IndexOutOfBoundsException if the index is out of range
+     *                                   ({@code index < 0 || index >= size()})
+     */
     @Override
     public E get(int index) {
-        return null;
+        if (index < 0 | index >= size())
+            throw new IndexOutOfBoundsException();
+        return (E) array[index];
     }
 
+    /**
+     * Replaces the element at the specified position in this list with the
+     * specified element (optional operation).
+     *
+     * @param index   index of the element to replace
+     * @param element element to be stored at the specified position
+     * @return the element previously at the specified position
+     * @throws ClassCastException        if the class of the specified element
+     *                                   prevents it from being added to this list
+     * @throws IllegalArgumentException  if some property of the specified
+     *                                   element prevents it from being added to this list
+     * @throws IndexOutOfBoundsException if the index is out of range
+     *                                   ({@code index < 0 || index >= size()})
+     */
     @Override
     public E set(int index, E element) {
-        return null;
+        E e = get(index);
+        array[index] = element;
+        return e;
     }
 
+    /**
+     * Inserts the specified element at the specified position in this list
+     * (optional operation).  Shifts the element currently at that position
+     * (if any) and any subsequent elements to the right (adds one to their
+     * indices).
+     *
+     * @param index   index at which the specified element is to be inserted
+     * @param element element to be inserted
+     * @throws ClassCastException        if the class of the specified element
+     *                                   prevents it from being added to this list
+     * @throws IllegalArgumentException  if some property of the specified
+     *                                   element prevents it from being added to this list
+     * @throws IndexOutOfBoundsException if the index is out of range
+     *                                   ({@code index < 0 || index > size()})
+     */
     @Override
     public void add(int index, E element) {
-
+        if (index < 0 || index > size())
+            throw new IndexOutOfBoundsException();
+        if (size() == array.length)
+            maximizeAndCopyArray();
+        for (int i = size() - 1; i >= index; i--) {
+            array[i + 1] = array[i];
+        }
+        array[index] = element;
     }
 
+    /**
+     * Removes the element at the specified position in this list (optional
+     * operation).  Shifts any subsequent elements to the left (subtracts one
+     * from their indices).  Returns the element that was removed from the
+     * list.
+     *
+     * @param index the index of the element to be removed
+     * @return the element previously at the specified position
+     * @throws UnsupportedOperationException if the {@code remove} operation
+     *                                       is not supported by this list
+     * @throws IndexOutOfBoundsException     if the index is out of range
+     *                                       ({@code index < 0 || index >= size()})
+     */
     @Override
     public E remove(int index) {
-        return null;
+        if (index < 0 || index >= size())
+            throw new IndexOutOfBoundsException();
+        E e = get(index);
+        for (int i = index; i < size(); i++) {
+            array[i] = array[i + 1];
+        }
+        size--;
+        minimizeAndCopyArray();
+        return e;
     }
 
     // Search Operations
@@ -377,18 +609,37 @@ public class MyList<E> implements List<E> {
      */
     @Override
     public int indexOf(Object o) {
-        if (size == 0)
+        if (size() == 0)
             return -1;
         E el = (E) o;
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < size(); i++)
             if (Objects.equals(el, array[i]))
                 return i;
         return -1;
     }
 
+    /**
+     * Returns the index of the last occurrence of the specified element
+     * in this list, or -1 if this list does not contain the element.
+     * More formally, returns the highest index {@code i} such that
+     * {@code Objects.equals(o, get(i))},
+     * or -1 if there is no such index.
+     *
+     * @param o element to search for
+     * @return the index of the last occurrence of the specified element in
+     *         this list, or -1 if this list does not contain the element
+     * @throws ClassCastException if the type of the specified element
+     *         is incompatible with this list
+     *         (<a href="Collection.html#optional-restrictions">optional</a>)
+     */
     @Override
     public int lastIndexOf(Object o) {
-        return 0;
+        E e = (E) o;
+        int lastIndex = -1;
+        for(int i = 0; i < size(); i++)
+            if (Objects.equals(e, array[i]))
+                return lastIndex = i;
+        return lastIndex;
     }
 
     @Override
