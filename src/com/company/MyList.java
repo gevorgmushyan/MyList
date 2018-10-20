@@ -1,5 +1,7 @@
 package com.company;
 
+import javafx.beans.binding.When;
+
 import java.util.*;
 
 public class MyList<E> implements List<E> {
@@ -98,6 +100,8 @@ public class MyList<E> implements List<E> {
          */
         @Override
         public E next() {
+            if (index >= size())
+                throw new NoSuchElementException();
             allowRemoveCall = true;
             return (E) array[index++];
         }
@@ -207,8 +211,14 @@ public class MyList<E> implements List<E> {
      */
     @Override
     public <T> T[] toArray(T[] a) {
-        //TODO
-        return null;
+        if (a.length < size)
+            // Make a new array of a's runtime type, but my contents:
+            return (T[]) Arrays.copyOf(array, size, a.getClass());
+        System.arraycopy(array, 0, a, 0, size);
+        if (a.length > size)
+            a[size] = null;
+        return a;
+        //TODO -- copied from ArrayList
     }
 
     // Modification Operations
@@ -227,7 +237,7 @@ public class MyList<E> implements List<E> {
     @Override
     public boolean add(E e) {
         if (size() == array.length)
-            maximizeAndCopyArray();
+            maximizeArray();
         addElementToArray(e);
         return true;
     }
@@ -240,25 +250,26 @@ public class MyList<E> implements List<E> {
     /**
      * Maximized array two times, and replaces old values in new resized array
      */
-    private void maximizeAndCopyArray() {
+    private void maximizeArray() {
         Object[] newArray = new Object[array.length * 2];
         System.arraycopy(array, 0, newArray, 0, size());
         array = newArray;
     }
 
     /**
-     * Minimize array one and a half times, and replaces old values in new resized
+     * If the real size of array three or more times large then element count in list,
+     * minimize array one and a half times, and replaces old values in new resized
      * array. The minnimal size of the massive shoulb be {@code defaultListSize}
      */
-    private void minimizeAndCopyArray() {
+    private void minimizeArray() {
         if (array.length <= defaultListSize)
             return;
-        if (array.length <= 2 * size())
+        if (array.length <= 3 * size())
             return;
-        int n = (int) (array.length * 1.5);
+        int n = (int) (array.length * 0.75);
         if (n < defaultListSize)
             n = defaultListSize;
-        Object[] newArray = new Object[(int) (array.length * 1.5)];
+        Object[] newArray = new Object[n];
         System.arraycopy(array, 0, newArray, 0, size());
         array = newArray;
     }
@@ -308,11 +319,14 @@ public class MyList<E> implements List<E> {
         if (size() == 0)
             return false;
         boolean res = false;
-        for (int i = 0; i < size(); i++)
+        for (int i = 0; i < size(); i++) {
             if (Objects.equals(e, array[i])) {
-                remove(e);
+                remove(i);
+                i--;
                 res = true;
             }
+        }
+        minimizeArray();
         return res;
     }
 
@@ -428,8 +442,8 @@ public class MyList<E> implements List<E> {
     /**
      * @param list MyList object to added current list
      * @return current list if the siso of the {@code list} param is 0, else
-     *         return the added result list
-     * @throws NullPointerException          if the specified collection is null
+     * return the added result list
+     * @throws NullPointerException if the specified collection is null
      */
     public MyList<E> addList(MyList list) {
         if (list == null)
@@ -450,9 +464,9 @@ public class MyList<E> implements List<E> {
      *
      * @param c collection containing elements to be removed from this list
      * @return {@code true} if this list changed as a result of the call
-     * @throws ClassCastException if the class of an element of this list
-     *         is incompatible with the specified collection
-     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws ClassCastException   if the class of an element of this list
+     *                              is incompatible with the specified collection
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>)
      * @throws NullPointerException if the specified collection is null
      */
     @Override
@@ -460,8 +474,7 @@ public class MyList<E> implements List<E> {
         Iterator it = c.iterator();
         boolean modified = false;
         while (it.hasNext()) {
-            E e = (E) it.next();
-            if(removeAll(e))
+            if (removeAll((E) it.next()))
                 modified = true;
         }
         return modified;
@@ -475,19 +488,28 @@ public class MyList<E> implements List<E> {
      *
      * @param c collection containing elements to be retained in this list
      * @return {@code true} if this list changed as a result of the call
-     * @throws UnsupportedOperationException if the {@code retainAll} operation
-     *         is not supported by this list
-     * @throws ClassCastException if the class of an element of this list
-     *         is incompatible with the specified collection
-     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws ClassCastException   if the class of an element of this list
+     *                              is incompatible with the specified collection
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>)
      * @throws NullPointerException if the specified collection is null
      * @see #remove(Object)
      * @see #contains(Object)
      */
     @Override
     public boolean retainAll(Collection<?> c) {
-        return false;
-        //TODO
+        if (c == null)
+            throw new NullPointerException();
+        if (size() == 0)
+            return false;
+        boolean isListChaged = false;
+        Iterator it = c.iterator();
+        for(int i = 0; i < size(); i++ ) {
+            if(!c.contains(get(i))) {
+                removeAll(get(i));
+                isListChaged = true;
+            }
+        }
+        return isListChaged;
     }
 
     /**
@@ -497,7 +519,7 @@ public class MyList<E> implements List<E> {
     @Override
     public void clear() {
         size = 0;
-        minimizeAndCopyArray();
+        minimizeArray();
     }
 
     // Positional Access Operations
@@ -558,11 +580,12 @@ public class MyList<E> implements List<E> {
         if (index < 0 || index > size())
             throw new IndexOutOfBoundsException();
         if (size() == array.length)
-            maximizeAndCopyArray();
+            maximizeArray();
         for (int i = size() - 1; i >= index; i--) {
             array[i + 1] = array[i];
         }
         array[index] = element;
+        size++;
     }
 
     /**
@@ -587,7 +610,7 @@ public class MyList<E> implements List<E> {
             array[i] = array[i + 1];
         }
         size--;
-        minimizeAndCopyArray();
+        minimizeArray();
         return e;
     }
 
@@ -627,33 +650,286 @@ public class MyList<E> implements List<E> {
      *
      * @param o element to search for
      * @return the index of the last occurrence of the specified element in
-     *         this list, or -1 if this list does not contain the element
+     * this list, or -1 if this list does not contain the element
      * @throws ClassCastException if the type of the specified element
-     *         is incompatible with this list
-     *         (<a href="Collection.html#optional-restrictions">optional</a>)
+     *                            is incompatible with this list
+     *                            (<a href="Collection.html#optional-restrictions">optional</a>)
      */
     @Override
     public int lastIndexOf(Object o) {
-        E e = (E) o;
         int lastIndex = -1;
-        for(int i = 0; i < size(); i++)
-            if (Objects.equals(e, array[i]))
-                return lastIndex = i;
+        for (int i = 0; i < size(); i++)
+            if (Objects.equals(o, array[i]))
+                lastIndex = i;
         return lastIndex;
     }
 
+    /**
+     * Returns a list iterator over the elements in this list (in proper
+     * sequence).
+     *
+     * @return a list iterator over the elements in this list (in proper
+     * sequence)
+     */
     @Override
     public ListIterator<E> listIterator() {
-        return null;
+        return new MyListItr<>();
     }
 
+    /**
+     * Returns a list iterator over the elements in this list (in proper
+     * sequence), starting at the specified position in the list.
+     * The specified index indicates the first element that would be
+     * returned by an initial call to {@link ListIterator#next next}.
+     * An initial call to {@link ListIterator#previous previous} would
+     * return the element with the specified index minus one.
+     *
+     * @param index index of the first element to be returned from the
+     *              list iterator (by a call to {@link ListIterator#next next})
+     * @return a list iterator over the elements in this list (in proper
+     * sequence), starting at the specified position in the list
+     * @throws IndexOutOfBoundsException if the index is out of range
+     *                                   ({@code index < 0 || index > size()})
+     */
     @Override
     public ListIterator<E> listIterator(int index) {
-        return null;
+        if(index < 0 || index > size())
+            throw new IndexOutOfBoundsException();
+        ListIterator it = new MyListItr<>();
+
+        for(int i = 0; i < index; i++)
+            it.next();
+        return it;
+        //TODO -- anonymous class
     }
 
+    class MyListItr<F> implements ListIterator<F> {
+        private int index = 0;
+        private boolean allowRemoveOrSet = false;
+        private int lastReturndIndex = -1;
+
+        public MyListItr() {
+        }
+        // Query Operations
+
+        /**
+         * Returns {@code true} if this list iterator has more elements when
+         * traversing the list in the forward direction. (In other words,
+         * returns {@code true} if {@link #next} would return an element rather
+         * than throwing an exception.)
+         *
+         * @return {@code true} if the list iterator has more elements when
+         * traversing the list in the forward direction
+         */
+        @Override
+        public boolean hasNext() {
+            if (size() == 0)
+                return false;
+            return index < size();
+        }
+
+        /**
+         * Returns the next element in the list and advances the cursor position.
+         * This method may be called repeatedly to iterate through the list,
+         * or intermixed with calls to {@link #previous} to go back and forth.
+         * (Note that alternating calls to {@code next} and {@code previous}
+         * will return the same element repeatedly.)
+         *
+         * @return the next element in the list
+         * @throws NoSuchElementException if the iteration has no next element
+         */
+        @Override
+        public F next() {
+            if (index >= size())
+                throw new NoSuchElementException();
+            allowRemoveOrSet = true;
+            lastReturndIndex = index;
+            return (F) array[index++];
+        }
+
+        /**
+         * Returns {@code true} if this list iterator has more elements when
+         * traversing the list in the reverse direction.  (In other words,
+         * returns {@code true} if {@link #previous} would return an element
+         * rather than throwing an exception.)
+         *
+         * @return {@code true} if the list iterator has more elements when
+         * traversing the list in the reverse direction
+         */
+        public boolean hasPrevious() {
+            if (size == 0)
+                return false;
+            if (index > 0)
+                return true;
+            return false;
+        }
+
+        /**
+         * Returns the previous element in the list and moves the cursor
+         * position backwards.  This method may be called repeatedly to
+         * iterate through the list backwards, or intermixed with calls to
+         * {@link #next} to go back and forth.  (Note that alternating calls
+         * to {@code next} and {@code previous} will return the same
+         * element repeatedly.)
+         *
+         * @return the previous element in the list
+         * @throws NoSuchElementException if the iteration has no previous
+         *                                element
+         */
+        public F previous() {
+            if (size == 0 || index <= 0)
+                throw new NoSuchElementException();
+            allowRemoveOrSet = true;
+            lastReturndIndex = index;
+            return (F) array[index--];
+        }
+
+        /**
+         * Returns the index of the element that would be returned by a
+         * subsequent call to {@link #next}. (Returns list size if the list
+         * iterator is at the end of the list.)
+         *
+         * @return the index of the element that would be returned by a
+         * subsequent call to {@code next}, or list size if the list
+         * iterator is at the end of the list
+         */
+        public int nextIndex() {
+            return index;
+        }
+
+        /**
+         * Returns the index of the element that would be returned by a
+         * subsequent call to {@link #previous}. (Returns -1 if the list
+         * iterator is at the beginning of the list.)
+         *
+         * @return the index of the element that would be returned by a
+         * subsequent call to {@code previous}, or -1 if the list
+         * iterator is at the beginning of the list
+         */
+        public int previousIndex() {
+            return index - 1;
+        }
+
+        // Modification Operations
+
+        /**
+         * Removes from the list the last element that was returned by {@link
+         * #next} or {@link #previous} (optional operation).  This call can
+         * only be made once per call to {@code next} or {@code previous}.
+         * It can be made only if {@link #add} has not been
+         * called after the last call to {@code next} or {@code previous}.
+         *
+         * @throws IllegalStateException if neither {@code next} nor
+         *                               {@code previous} have been called, or {@code remove} or
+         *                               {@code add} have been called after the last call to
+         *                               {@code next} or {@code previous}
+         */
+        public void remove() {
+            if (!allowRemoveOrSet)
+                throw new IllegalStateException();
+            allowRemoveOrSet = false;
+            MyList.this.remove(index);
+            if (size < index)
+                index = size;
+        }
+
+        /**
+         * Replaces the last element returned by {@link #next} or
+         * {@link #previous} with the specified element (optional operation).
+         * This call can be made only if neither {@link #remove} nor {@link
+         * #add} have been called after the last call to {@code next} or
+         * {@code previous}.
+         *
+         * @param e the element with which to replace the last element returned by
+         *          {@code next} or {@code previous}
+         * @throws ClassCastException       if the class of the specified element
+         *                                  prevents it from being added to this list
+         * @throws IllegalArgumentException if some aspect of the specified
+         *                                  element prevents it from being added to this list
+         * @throws IllegalStateException    if neither {@code next} nor
+         *                                  {@code previous} have been called, or {@code remove} or
+         *                                  {@code add} have been called after the last call to
+         *                                  {@code next} or {@code previous}
+         */
+        public void set(F e) {
+            if (!allowRemoveOrSet)
+                throw new IllegalStateException();
+            MyList.this.set(lastReturndIndex, (E) e);
+        }
+
+        /**
+         * Inserts the specified element into the list (optional operation).
+         * The element is inserted immediately before the element that
+         * would be returned by {@link #next}, if any, and after the element
+         * that would be returned by {@link #previous}, if any.  (If the
+         * list contains no elements, the new element becomes the sole element
+         * on the list.)  The new element is inserted before the implicit
+         * cursor: a subsequent call to {@code next} would be unaffected, and a
+         * subsequent call to {@code previous} would return the new element.
+         * (This call increases by one the value that would be returned by a
+         * call to {@code nextIndex} or {@code previousIndex}.)
+         *
+         * @param e the element to insert
+         * @throws ClassCastException       if the class of the specified element
+         *                                  prevents it from being added to this list
+         * @throws IllegalArgumentException if some aspect of this element
+         *                                  prevents it from being added to this list
+         */
+        public void add(F e) {
+            allowRemoveOrSet = false;
+            if (size() == 0) {
+                MyList.this.add((E) e);
+                index = 0;
+            } else {
+                MyList.this.add(lastReturndIndex, (E) e);
+                lastReturndIndex++;
+                index++;
+            }
+        }
+    }
+
+    /**
+     * Returns a view of the portion of this list between the specified
+     * {@code fromIndex}, inclusive, and {@code toIndex}, exclusive.  (If
+     * {@code fromIndex} and {@code toIndex} are equal, the returned list is
+     * empty.)  The returned list is backed by this list, so non-structural
+     * changes in the returned list are reflected in this list, and vice-versa.
+     * The returned list supports all of the optional list operations supported
+     * by this list.<p>
+     * <p>
+     * This method eliminates the need for explicit range operations (of
+     * the sort that commonly exist for arrays).  Any operation that expects
+     * a list can be used as a range operation by passing a subList view
+     * instead of a whole list.  For example, the following idiom
+     * removes a range of elements from a list:
+     * <pre>{@code
+     *      list.subList(from, to).clear();
+     * }</pre>
+     * Similar idioms may be constructed for {@code indexOf} and
+     * {@code lastIndexOf}, and all of the algorithms in the
+     * {@code Collections} class can be applied to a subList.<p>
+     * <p>
+     * The semantics of the list returned by this method become undefined if
+     * the backing list (i.e., this list) is <i>structurally modified</i> in
+     * any way other than via the returned list.  (Structural modifications are
+     * those that change the size of this list, or otherwise perturb it in such
+     * a fashion that iterations in progress may yield incorrect results.)
+     *
+     * @param fromIndex low endpoint (inclusive) of the subList
+     * @param toIndex   high endpoint (exclusive) of the subList
+     * @return a view of the specified range within this list
+     * @throws IndexOutOfBoundsException for an illegal endpoint index value
+     *                                   ({@code fromIndex < 0 || toIndex > size ||
+     *                                   fromIndex > toIndex})
+     */
     @Override
     public List<E> subList(int fromIndex, int toIndex) {
         return null;
+        //TODO
+    }
+
+    @Override
+    public String toString() {
+        return Arrays.toString(array);
     }
 }
